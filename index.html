@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>SafeVision — Industrial PPE & Hardhat Detection</title>
+  <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-deep: #070b12;
+      --bg: #0f172a;
+      --card: rgba(30, 41, 59, 0.72);
+      --card-solid: #1e293b;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --safety: #fbbf24;
+      --safety-dim: rgba(251, 191, 36, 0.15);
+      --cyan: #22d3ee;
+      --cyan-dim: rgba(34, 211, 238, 0.12);
+      --border: rgba(148, 163, 184, 0.22);
+      --danger: #f87171;
+      --glow: 0 0 40px rgba(251, 191, 36, 0.08);
+      --radius: 14px;
+      --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "DM Sans", system-ui, sans-serif;
+      background: var(--bg-deep);
+      color: var(--text);
+      line-height: 1.55;
+      overflow-x: hidden;
+    }
+
+    /* Animated mesh background */
+    .bg-mesh {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background:
+        radial-gradient(ellipse 80% 50% at 20% -10%, rgba(34, 211, 238, 0.12), transparent 50%),
+        radial-gradient(ellipse 60% 40% at 90% 10%, rgba(251, 191, 36, 0.08), transparent 45%),
+        radial-gradient(ellipse 50% 30% at 50% 100%, rgba(14, 165, 233, 0.06), transparent 50%),
+        var(--bg-deep);
+      pointer-events: none;
+    }
+
+    .bg-mesh::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image: url("{{ url_for('static', filename='img/hero-industrial.svg') }}");
+      background-size: cover;
+      background-position: center bottom;
+      opacity: 0.35;
+      mix-blend-mode: luminosity;
+      animation: meshShift 28s ease-in-out infinite alternate;
+    }
+
+    @keyframes meshShift {
+      0% { transform: scale(1) translateY(0); opacity: 0.32; }
+      100% { transform: scale(1.03) translateY(-8px); opacity: 0.4; }
+    }
+
+    /* Top hazard stripe — industrial cue */
+    .hazard-bar {
+      position: relative;
+      height: 6px;
+      background: repeating-linear-gradient(
+        -45deg,
+        #ca8a04 0px,
+        #ca8a04 12px,
+        #422006 12px,
+        #422006 24px
+      );
+      background-size: 34px 34px;
+      animation: hazardScroll 12s linear infinite;
+      z-index: 2;
+    }
+
+    @keyframes hazardScroll {
+      to { background-position: 34px 0; }
+    }
+
+    .wrap {
+      position: relative;
+      z-index: 1;
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 1.25rem 1.25rem 3rem;
+    }
+
+    /* Header */
+    .site-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1.75rem;
+      animation: fadeDown 0.7s var(--ease-out) both;
+    }
+
+    @keyframes fadeDown {
+      from { opacity: 0; transform: translateY(-12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .brand img.logo {
+      height: 52px;
+      width: auto;
+      filter: drop-shadow(var(--glow));
+      animation: logoFloat 5s ease-in-out infinite;
+    }
+
+    @keyframes logoFloat {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-3px); }
+    }
+
+    .brand-text h1 {
+      margin: 0;
+      font-size: clamp(1.25rem, 3.5vw, 1.65rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.2;
+    }
+
+    .brand-text .tagline {
+      margin: 0.2rem 0 0;
+      font-size: 0.82rem;
+      color: var(--muted);
+      font-weight: 500;
+      max-width: 26rem;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.45rem 0.9rem;
+      border-radius: 999px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--muted);
+      backdrop-filter: blur(12px);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #64748b;
+      transition: background 0.35s var(--ease-out), box-shadow 0.35s;
+    }
+
+    body.streaming .status-dot {
+      background: var(--safety);
+      box-shadow: 0 0 12px rgba(251, 191, 36, 0.85);
+      animation: pulseDot 1.6s ease-in-out infinite;
+    }
+
+    @keyframes pulseDot {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.15); opacity: 0.85; }
+    }
+
+    body.streaming .status-pill {
+      color: var(--safety);
+      border-color: rgba(251, 191, 36, 0.35);
+      background: var(--safety-dim);
+    }
+
+    /* Tab rail */
+    .tab-rail {
+      position: relative;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      padding: 0.35rem;
+      margin-bottom: 1.25rem;
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      backdrop-filter: blur(16px);
+      animation: fadeUp 0.65s var(--ease-out) 0.08s both;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .tab-btn {
+      position: relative;
+      z-index: 1;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.65rem 1.15rem;
+      border: none;
+      border-radius: 10px;
+      background: transparent;
+      color: var(--muted);
+      font-family: inherit;
+      font-weight: 700;
+      font-size: 0.88rem;
+      cursor: pointer;
+      transition: color 0.3s var(--ease-out), transform 0.2s;
+    }
+
+    .tab-btn .tab-ico {
+      width: 1.15rem;
+      height: 1.15rem;
+      opacity: 0.75;
+      transition: opacity 0.25s, transform 0.25s var(--ease-out);
+    }
+
+    .tab-btn:hover {
+      color: var(--text);
+    }
+
+    .tab-btn:hover .tab-ico {
+      opacity: 1;
+      transform: scale(1.08);
+    }
+
+    .tab-btn.active {
+      color: var(--bg-deep);
+    }
+
+    .tab-btn.active .tab-ico {
+      opacity: 1;
+    }
+
+    .tab-highlight {
+      position: absolute;
+      top: 0;
+      left: 0;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--safety), #f59e0b);
+      box-shadow: 0 4px 20px rgba(251, 191, 36, 0.35);
+      transition: transform 0.4s var(--ease-out), width 0.4s var(--ease-out), height 0.4s var(--ease-out);
+      z-index: 0;
+      pointer-events: none;
+      will-change: transform, width, height;
+    }
+
+    /* Panels */
+    .panel {
+      display: none;
+      opacity: 0;
+      transform: translateY(12px);
+    }
+
+    .panel.active {
+      display: block;
+      animation: panelIn 0.45s var(--ease-out) forwards;
+    }
+
+    @keyframes panelIn {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.35rem 1.45rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), var(--glow);
+      backdrop-filter: blur(16px);
+    }
+
+    .card h2 {
+      margin: 0 0 0.65rem;
+      font-size: 1.08rem;
+      font-weight: 700;
+      color: var(--cyan);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .card h2 svg {
+      flex-shrink: 0;
+      opacity: 0.9;
+    }
+
+    .hint {
+      margin: 0 0 1rem;
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+
+    .live-frame {
+      position: relative;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: #020617;
+      box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.5);
+    }
+
+    .live-frame::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: 10px;
+      pointer-events: none;
+      box-shadow: inset 0 0 0 1px rgba(34, 211, 238, 0.12);
+      z-index: 2;
+    }
+
+    .live-wrap img {
+      display: block;
+      width: 100%;
+      height: auto;
+      max-width: 800px;
+      min-height: 220px;
+      object-fit: contain;
+      background: #000;
+    }
+
+    .scan-line {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+      opacity: 0.45;
+      z-index: 3;
+      pointer-events: none;
+      animation: scanMove 3.5s ease-in-out infinite;
+    }
+
+    body:not(.streaming) .scan-line {
+      display: none;
+    }
+
+    @keyframes scanMove {
+      0%, 100% { top: 8%; opacity: 0.2; }
+      50% { top: 92%; opacity: 0.55; }
+    }
+
+    .row-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      margin-top: 1rem;
+      align-items: center;
+    }
+
+    label {
+      display: block;
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-bottom: 0.4rem;
+      font-weight: 600;
+    }
+
+    .file-input-wrap {
+      position: relative;
+      margin-bottom: 0.85rem;
+    }
+
+    input[type="file"] {
+      width: 100%;
+      padding: 0.65rem 0.75rem;
+      border-radius: 10px;
+      border: 1px dashed var(--border);
+      background: rgba(2, 6, 23, 0.45);
+      color: var(--muted);
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: border-color 0.25s, background 0.25s;
+    }
+
+    input[type="file"]:hover {
+      border-color: rgba(34, 211, 238, 0.45);
+      background: var(--cyan-dim);
+    }
+
+    button.primary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.45rem;
+      background: linear-gradient(135deg, var(--safety), #d97706);
+      color: #1c1917;
+      border: none;
+      padding: 0.65rem 1.25rem;
+      font-weight: 800;
+      font-size: 0.88rem;
+      border-radius: 10px;
+      cursor: pointer;
+      font-family: inherit;
+      box-shadow: 0 4px 16px rgba(251, 191, 36, 0.35);
+      transition: transform 0.2s var(--ease-out), box-shadow 0.25s;
+    }
+
+    button.primary:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(251, 191, 36, 0.45);
+    }
+
+    button.primary:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    button.secondary {
+      background: rgba(148, 163, 184, 0.12);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.65rem 1.15rem;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 0.88rem;
+      font-family: inherit;
+      transition: background 0.25s, border-color 0.25s;
+    }
+
+    button.secondary:hover {
+      background: rgba(148, 163, 184, 0.2);
+      border-color: rgba(148, 163, 184, 0.4);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    .spinner {
+      display: none;
+      width: 1rem;
+      height: 1rem;
+      border: 2px solid rgba(28, 25, 23, 0.35);
+      border-top-color: #1c1917;
+      border-radius: 50%;
+      animation: spin 0.65s linear infinite;
+    }
+
+    button.loading .spinner {
+      display: inline-block;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .err {
+      color: var(--danger);
+      font-size: 0.86rem;
+      margin-top: 0.75rem;
+      display: none;
+      padding: 0.5rem 0.65rem;
+      border-radius: 8px;
+      background: rgba(248, 113, 113, 0.1);
+      border: 1px solid rgba(248, 113, 113, 0.25);
+    }
+
+    .err.show {
+      display: block;
+      animation: shake 0.45s ease;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-4px); }
+      75% { transform: translateX(4px); }
+    }
+
+    /* Stat dashboard */
+    .stats-board {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 0.75rem;
+      margin-top: 1.25rem;
+    }
+
+    .stat-card {
+      position: relative;
+      overflow: hidden;
+      padding: 1rem 1.1rem;
+      border-radius: 12px;
+      background: linear-gradient(145deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95));
+      border: 1px solid var(--border);
+      transition: transform 0.3s var(--ease-out), border-color 0.3s;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(34, 211, 238, 0.35);
+    }
+
+    .stat-card::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 48%;
+      height: 100%;
+      background: linear-gradient(105deg, transparent, rgba(34, 211, 238, 0.05));
+      pointer-events: none;
+    }
+
+    .stat-card .label {
+      margin: 0;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+    }
+
+    .stat-card .value {
+      margin: 0.35rem 0 0;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 1.85rem;
+      font-weight: 700;
+      color: var(--safety);
+      line-height: 1;
+    }
+
+    .stat-card:nth-child(2) .value { color: var(--cyan); }
+    .stat-card:nth-child(3) .value { color: #e2e8f0; }
+
+    .preview-img {
+      margin-top: 1rem;
+      max-width: 100%;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      display: none;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+    }
+
+    .preview-img.show {
+      display: block;
+      animation: popIn 0.5s var(--ease-out);
+    }
+
+    @keyframes popIn {
+      from { opacity: 0; transform: scale(0.98); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    video.preview-vid {
+      margin-top: 1rem;
+      width: 100%;
+      max-width: 800px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #000;
+      display: none;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+    }
+
+    video.preview-vid.show {
+      display: block;
+      animation: popIn 0.5s var(--ease-out);
+    }
+
+    .meta {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 0.55rem;
+    }
+
+    /* Footer */
+    .site-footer {
+      margin-top: 2.5rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      font-size: 0.78rem;
+      color: var(--muted);
+      animation: fadeUp 0.8s var(--ease-out) 0.15s both;
+    }
+
+    .site-footer .badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .site-footer .badge {
+      padding: 0.25rem 0.55rem;
+      border-radius: 6px;
+      background: rgba(148, 163, 184, 0.12);
+      border: 1px solid var(--border);
+      font-weight: 600;
+      font-size: 0.72rem;
+    }
+
+    /* Decorative corner accents on main column */
+    .corner-accent {
+      position: absolute;
+      width: 120px;
+      height: 120px;
+      border: 1px solid rgba(34, 211, 238, 0.15);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .corner-accent.tl { top: 5rem; left: 1rem; border-right: none; border-bottom: none; }
+    .corner-accent.br { bottom: 4rem; right: 1rem; border-left: none; border-top: none; }
+
+    @media (max-width: 640px) {
+      .corner-accent { display: none; }
+      .brand { flex-direction: column; align-items: flex-start; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-mesh" aria-hidden="true"></div>
+  <div class="hazard-bar" role="presentation"></div>
+
+  <div class="wrap">
+    <div class="corner-accent tl" aria-hidden="true"></div>
+    <div class="corner-accent br" aria-hidden="true"></div>
+
+    <header class="site-header">
+      <div class="brand">
+        <img
+          class="logo"
+          src="{{ url_for('static', filename='img/logo.svg') }}"
+          width="200"
+          height="52"
+          alt="SafeVision PPE Monitor logo"
+        />
+        <div class="brand-text">
+          <h1>Industrial safety vision</h1>
+          <p class="tagline">YOLOv8-powered head &amp; hardhat detection for live sites, QA images, and batch video review.</p>
+        </div>
+      </div>
+      <div class="status-pill" title="Live stream status">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span id="status-label">Standby</span>
+      </div>
+    </header>
+
+    <nav class="tab-rail" aria-label="Detection modes">
+      <span class="tab-highlight" id="tab-highlight" aria-hidden="true"></span>
+      <button type="button" class="tab-btn active" data-tab="live" data-idx="0">
+        <svg class="tab-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+        </svg>
+        Live camera
+      </button>
+      <button type="button" class="tab-btn" data-tab="image" data-idx="1">
+        <svg class="tab-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <circle cx="8.5" cy="8.5" r="1.5"/>
+          <path d="M21 15l-5-5L5 21"/>
+        </svg>
+        Upload image
+      </button>
+      <button type="button" class="tab-btn" data-tab="video" data-idx="2">
+        <svg class="tab-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <polygon points="23 7 16 12 23 17 23 7"/>
+          <rect x="1" y="5" width="15" height="14" rx="2"/>
+        </svg>
+        Upload video
+      </button>
+    </nav>
+
+    <!-- Live -->
+    <section id="panel-live" class="panel active card" aria-labelledby="live-heading">
+      <h2 id="live-heading">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+        </svg>
+        Live detection
+      </h2>
+      <p class="hint">Webcam stream with real-time counts (MJPEG). Use <strong>Start camera</strong> if the feed is blank.</p>
+      <div class="live-frame">
+        <div class="scan-line" aria-hidden="true"></div>
+        <div class="live-wrap">
+          <img id="live-img" src="" alt="Live detection stream" />
+        </div>
+      </div>
+      <div class="row-actions">
+        <button type="button" class="primary" id="live-start">Start camera</button>
+        <button type="button" class="secondary" id="live-stop">Stop camera</button>
+      </div>
+      <p class="hint">Detection overlays head / helmet boxes and rolling counts on the video.</p>
+    </section>
+
+    <!-- Image -->
+    <section id="panel-image" class="panel card" aria-labelledby="image-heading">
+      <h2 id="image-heading">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14"/>
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+        </svg>
+        Analyze image
+      </h2>
+      <p class="hint">PNG, JPG, JPEG, WebP, BMP — annotated result saved under results.</p>
+      <label for="img-file">Choose image file</label>
+      <div class="file-input-wrap">
+        <input type="file" id="img-file" accept=".png,.jpg,.jpeg,.webp,.bmp,image/*" />
+      </div>
+      <button type="button" class="primary" id="img-btn">
+        <span class="spinner" aria-hidden="true"></span>
+        Analyze image
+      </button>
+      <div class="err" id="img-err" role="alert"></div>
+      <img id="img-preview" class="preview-img" alt="Annotated detection result" />
+    </section>
+
+    <!-- Video -->
+    <section id="panel-video" class="panel card" aria-labelledby="video-heading">
+      <h2 id="video-heading">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14V10z"/>
+          <rect x="3" y="6" width="12" height="12" rx="2"/>
+        </svg>
+        Analyze video
+      </h2>
+      <p class="hint">MP4, AVI, MOV, MKV, WEBM — peak counts and annotated output video.</p>
+      <label for="vid-file">Choose video file</label>
+      <div class="file-input-wrap">
+        <input type="file" id="vid-file" accept="video/*,.mp4,.avi,.mov,.mkv,.webm" />
+      </div>
+      <button type="button" class="primary" id="vid-btn">
+        <span class="spinner" aria-hidden="true"></span>
+        Process video
+      </button>
+      <div class="err" id="vid-err" role="alert"></div>
+      <p class="meta" id="vid-progress" style="display:none;"></p>
+      <video id="vid-preview" class="preview-vid" controls playsinline></video>
+    </section>
+
+    <div class="stats-board" aria-live="polite">
+      <div class="stat-card">
+        <p class="label">Head count</p>
+        <p class="value" id="heads">0</p>
+      </div>
+      <div class="stat-card">
+        <p class="label">Helmet count</p>
+        <p class="value" id="helmets">0</p>
+      </div>
+      <div class="stat-card">
+        <p class="label">Total count</p>
+        <p class="value" id="total">0</p>
+      </div>
+    </div>
+    <p class="meta" id="video-stats" style="display:none;"></p>
+
+    <footer class="site-footer">
+      <span>SafeVision · On-premise safety analytics</span>
+      <div class="badges">
+        <span class="badge">YOLOv8</span>
+        <span class="badge">Ultralytics</span>
+        <span class="badge">Flask</span>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    (function () {
+      function showErr(el, msg) {
+        el.textContent = msg || "";
+        el.classList.toggle("show", !!msg);
+      }
+
+      function setStreaming(on) {
+        document.body.classList.toggle("streaming", on);
+        var lab = document.getElementById("status-label");
+        if (lab) lab.textContent = on ? "Live" : "Standby";
+      }
+
+      function moveTabHighlight(btn) {
+        var rail = document.querySelector(".tab-rail");
+        var hi = document.getElementById("tab-highlight");
+        if (!rail || !hi || !btn) return;
+        var r = rail.getBoundingClientRect();
+        var b = btn.getBoundingClientRect();
+        hi.style.width = b.width + "px";
+        hi.style.height = b.height + "px";
+        hi.style.transform =
+          "translate(" + (b.left - r.left) + "px, " + (b.top - r.top) + "px)";
+      }
+
+      window.addEventListener("resize", function () {
+        var active = document.querySelector(".tab-btn.active");
+        if (active) moveTabHighlight(active);
+      });
+
+      document.querySelectorAll(".tab-btn").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var tab = btn.getAttribute("data-tab");
+          document.querySelectorAll(".tab-btn").forEach(function (b) {
+            b.classList.toggle("active", b === btn);
+          });
+          document.querySelectorAll(".panel").forEach(function (p) {
+            p.classList.remove("active");
+          });
+          document.getElementById("panel-" + tab).classList.add("active");
+          moveTabHighlight(btn);
+        });
+      });
+
+      var firstTab = document.querySelector(".tab-btn.active");
+      if (firstTab) {
+        requestAnimationFrame(function () {
+          moveTabHighlight(firstTab);
+        });
+      }
+
+      document.getElementById("live-start").addEventListener("click", function () {
+        var img = document.getElementById("live-img");
+        img.src = "/api/stream?t=" + Date.now();
+        setStreaming(true);
+      });
+
+      document.getElementById("live-stop").addEventListener("click", function () {
+        var img = document.getElementById("live-img");
+        img.removeAttribute("src");
+        img.alt = "Stream stopped";
+        setStreaming(false);
+      });
+
+      var liveImg = document.getElementById("live-img");
+      liveImg.addEventListener("error", function () {
+        setStreaming(false);
+      });
+
+      liveImg.src = "/api/stream?t=" + Date.now();
+      setStreaming(true);
+
+      document.getElementById("img-btn").addEventListener("click", async function () {
+        var btn = document.getElementById("img-btn");
+        var errEl = document.getElementById("img-err");
+        var input = document.getElementById("img-file");
+        var preview = document.getElementById("img-preview");
+        showErr(errEl, "");
+        preview.classList.remove("show");
+        if (!input.files || !input.files[0]) {
+          showErr(errEl, "Choose an image file first.");
+          return;
+        }
+        btn.disabled = true;
+        btn.classList.add("loading");
+        var fd = new FormData();
+        fd.append("file", input.files[0]);
+        try {
+          var res = await fetch("/api/upload_image", { method: "POST", body: fd });
+          var data = await res.json();
+          if (!res.ok) {
+            showErr(errEl, data.error || "Request failed");
+            return;
+          }
+          document.getElementById("heads").textContent = data.head_count;
+          document.getElementById("helmets").textContent = data.helmet_count;
+          document.getElementById("total").textContent = data.total_count;
+          preview.src = data.result_image_url + "?t=" + Date.now();
+          preview.classList.add("show");
+          document.getElementById("video-stats").style.display = "none";
+        } catch (e) {
+          showErr(errEl, String(e.message || e));
+        } finally {
+          btn.disabled = false;
+          btn.classList.remove("loading");
+        }
+      });
+
+      document.getElementById("vid-btn").addEventListener("click", async function () {
+        var btn = document.getElementById("vid-btn");
+        var errEl = document.getElementById("vid-err");
+        var input = document.getElementById("vid-file");
+        var vidEl = document.getElementById("vid-preview");
+        var prog = document.getElementById("vid-progress");
+        var stats = document.getElementById("video-stats");
+        showErr(errEl, "");
+        vidEl.classList.remove("show");
+        vidEl.removeAttribute("src");
+        prog.style.display = "none";
+        stats.style.display = "none";
+        if (!input.files || !input.files[0]) {
+          showErr(errEl, "Choose a video file first.");
+          return;
+        }
+        btn.disabled = true;
+        btn.classList.add("loading");
+        prog.style.display = "block";
+        prog.textContent = "Processing video — this may take several minutes for long files.";
+        var fd = new FormData();
+        fd.append("file", input.files[0]);
+        try {
+          var res = await fetch("/api/upload_video", { method: "POST", body: fd });
+          var data = await res.json();
+          if (!res.ok) {
+            showErr(errEl, data.error || "Request failed");
+            prog.style.display = "none";
+            return;
+          }
+          document.getElementById("heads").textContent = data.head_count_max;
+          document.getElementById("helmets").textContent = data.helmet_count_max;
+          document.getElementById("total").textContent = data.total_count_max;
+          vidEl.src = data.result_video_url + "?t=" + Date.now();
+          vidEl.classList.add("show");
+          prog.style.display = "none";
+          stats.style.display = "block";
+          stats.textContent =
+            "Peak counts across all frames · Frames processed: " + data.frames_processed;
+        } catch (e) {
+          showErr(errEl, String(e.message || e));
+          prog.style.display = "none";
+        } finally {
+          btn.disabled = false;
+          btn.classList.remove("loading");
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
