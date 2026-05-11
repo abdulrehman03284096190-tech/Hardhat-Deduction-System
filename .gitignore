@@ -1,0 +1,10 @@
+venv/
+__pycache__/
+*.py[cod]
+static/results/*.jpg
+static/results/*.png
+static/results/*.jpeg
+*.mp4
+*.avi
+.env
+instance/
