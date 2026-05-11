@@ -1,0 +1,9 @@
+# Install order: numpy first (binary wheels), then ultralytics (needs numpy compatible with your Python).
+# ultralytics 8.3.0 pins numpy<2 and can force a source build on Windows without Visual Studio — use 8.3.78+ with numpy 2.x wheels instead.
+flask==3.0.3
+numpy>=2.0.0,<3.0.0
+ultralytics>=8.3.78,<9.0.0
+opencv-python==4.10.0.84
+python-dotenv==1.0.1
+torch>=2.1.0
+torchvision>=0.16.0
